@@ -15,15 +15,21 @@ struct HomeView: View {
     }
 
     var body: some View {
-        List {
-            ForEach(viewModel.venues) { venue in
-                HStack{
-                    Image(systemName: "photo")
-                        .frame(width: 25, height: 25)
-                    VStack(alignment: .leading) {
-                        Text(venue.name ?? "")
-                            .bold()
-                        Text(venue.address ?? "")
+        Group {
+            if viewModel.venues.isEmpty {
+                ProgressView()
+            } else {
+                List {
+                    ForEach(viewModel.venues) { venue in
+                        HStack{
+                            Image(systemName: "photo")
+                                .frame(width: 25, height: 25)
+                            VStack(alignment: .leading) {
+                                Text(venue.name ?? "")
+                                    .bold()
+                                Text(venue.address ?? "")
+                            }
+                        }
                     }
                 }
             }
