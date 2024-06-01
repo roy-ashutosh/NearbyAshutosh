@@ -32,7 +32,9 @@ public final class HomeViewModel: ObservableObject {
         locationProvider.locationPublisher.sink { loc in
             guard let loc else { return }
             self.location = loc
-            await self.fetchVenues()
+            Task {
+                await self.fetchVenues()
+            }
         }
         .store(in: &subscriptions)
     }
