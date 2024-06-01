@@ -10,33 +10,28 @@ import Combine
 
 protocol LocationProvider {
     func checkAuthorizationAndRequestLocation()
-    var location: LocationModel? { get }
-    var locationPublisher: AnyPublisher<LocationModel?, Never> { get }
+    var locationPublisher: AnyPublisher<LocationModel, Error> { get }
 }
 
 class LocationProviderImpl: NSObject, ObservableObject, CLLocationManagerDelegate, LocationProvider {
+    
     let locationManager = CLLocationManager()
-
-    @Published var location: LocationModel?
-
-    var locationPublisher: AnyPublisher<LocationModel?, Never> {
-        return $location.removeDuplicates { old, new in
-            old?.latitude == new?.latitude && old?.longitude == new?.longitude
-        }.eraseToAnyPublisher()
+    
+    private var subject: PassthroughSubject<LocationModel, Error> = .init()
+    
+    var locationPublisher: AnyPublisher<LocationModel, Error> {
+        subject.eraseToAnyPublisher()
     }
-
-    override init() {
-        super.init()
-    }
-
+    
     func checkAuthorizationAndRequestLocation() {
+        locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        locationManager.delegate = self
         let status = locationManager.authorizationStatus
         switch status {
         case .authorizedWhenInUse, .authorizedAlways:
-            print("Location available")
-            locationManager.requestLocation()
+            locationManager.startUpdatingLocation()
         case .notDetermined:
-            requestLocation()
+            locationManager.requestLocation()
         case .denied, .restricted:
             print("Location services are disabled")
         @unknown default:
@@ -44,15 +39,23 @@ class LocationProviderImpl: NSObject, ObservableObject, CLLocationManagerDelegat
         }
     }
     
-    private func requestLocation() {
-        locationManager.delegate = self
-        locationManager.requestWhenInUseAuthorization()
-        locationManager.startUpdatingLocation()
-    }
-
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        if let coordinate = locations.first?.coordinate {
-            location = .init(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        if let coordinate = locations.last?.coordinate {
+            subject.send(.init(latitude: coordinate.latitude, longitude: coordinate.longitude))
+            manager.stopUpdatingLocation()
         }
+    }
+    
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        switch manager.authorizationStatus {
+        case .notDetermined, .restricted, .denied:
+            manager.startUpdatingLocation()
+        default:
+            manager.stopUpdatingLocation()
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("Failed to find user's location: \(error.localizedDescription)")
     }
 }
