@@ -10,7 +10,6 @@ import Combine
 @MainActor
 public final class HomeViewModel: ObservableObject {
     
-    @Published var location: LocationModel?
     @Published var venues = [Venue]()
     
     let locationProvider: LocationProvider
@@ -24,23 +23,24 @@ public final class HomeViewModel: ObservableObject {
     }
     
     func prepare() async {
-        locationProvider.checkAuthorizationAndRequestLocation()
         subscribeToLocation()
+        locationProvider.checkAuthorizationAndRequestLocation()
     }
     
     private func subscribeToLocation() {
-        locationProvider.locationPublisher.sink { loc in
-            guard let loc else { return }
-            self.location = loc
-            Task {
-                await self.fetchVenues()
+        locationProvider
+            .locationPublisher
+            .sink { error in
+                print(error)
+            } receiveValue: { loc in
+                Task {
+                    await self.fetchVenues(location: loc)
+                }
             }
-        }
-        .store(in: &subscriptions)
+            .store(in: &subscriptions)
     }
     
-    private func fetchVenues() async {
-        guard let location = location else { return }
+    private func fetchVenues(location: LocationModel) async {
         do {
             venues = try await venueService
                 .fetchVenues(latitude: location.latitude, longitude: location.longitude)
